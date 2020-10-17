@@ -331,12 +331,16 @@ func (f ManagerFunc) Layout(g *Gui) error {
 
 // SetManager sets the given GUI managers. It deletes all views and
 // keybindings.
-func (g *Gui) SetManager(managers ...Manager) {
+func (g *Gui) SetManager(managers ...Manager) error {
 	g.managers = managers
 	g.currentView = nil
 	g.views = nil
 	g.keybindings = nil
-	g.tbEvents <- termbox.Event{Type: termbox.EventResize}
+	resize := termbox.Event{Type: termbox.EventResize}
+	if err := g.handleEvent(&resize); err != nil {
+		return err
+	}
+	return nil
 }
 
 // SetManagerFunc sets the given manager function. It deletes all views and
