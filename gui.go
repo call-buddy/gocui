@@ -336,8 +336,7 @@ func (g *Gui) SetManager(managers ...Manager) {
 	g.currentView = nil
 	g.views = nil
 	g.keybindings = nil
-
-	go func() { g.tbEvents <- termbox.Event{Type: termbox.EventResize} }()
+	g.tbEvents <- termbox.Event{Type: termbox.EventResize}
 }
 
 // SetManagerFunc sets the given manager function. It deletes all views and
