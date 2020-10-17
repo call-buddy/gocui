@@ -336,11 +336,7 @@ func (g *Gui) SetManager(managers ...Manager) error {
 	g.currentView = nil
 	g.views = nil
 	g.keybindings = nil
-	resize := termbox.Event{Type: termbox.EventResize}
-	if err := g.handleEvent(&resize); err != nil {
-		return err
-	}
-	return nil
+	return g.flush()
 }
 
 // SetManagerFunc sets the given manager function. It deletes all views and
