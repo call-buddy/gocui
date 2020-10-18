@@ -6,6 +6,8 @@ package gocui
 
 import (
 	"errors"
+	"sync"
+	"sync/atomic"
 
 	"github.com/nsf/termbox-go"
 )
@@ -32,8 +34,16 @@ const (
 // Gui represents the whole User Interface, including the views, layouts
 // and keybindings.
 type Gui struct {
+	// Update() should have non-blocking and total order semantics,
+	// use condition variable here to guarantee this
+	// https://computing.llnl.gov/tutorials/pthreads/#ConVarSignal
+	userEvents        chan userEvent
+	updateMutex       sync.Mutex
+	updateWaitCounter uint64
+	updateWaitIndex   uint64
+	updateWaitCond    *sync.Cond
+
 	tbEvents    chan termbox.Event
-	userEvents  chan userEvent
 	views       []*View
 	currentView *View
 	managers    []Manager
@@ -78,6 +88,9 @@ func NewGui(mode OutputMode) (*Gui, error) {
 
 	g.outputMode = mode
 	termbox.SetOutputMode(termbox.OutputMode(mode))
+
+	g.updateWaitCond = sync.NewCond(&g.updateMutex)
+	g.updateWaitIndex = 1 // waitCounter will be increased on every Update()
 
 	g.tbEvents = make(chan termbox.Event, 20)
 	g.userEvents = make(chan userEvent, 20)
@@ -306,10 +319,21 @@ type userEvent struct {
 // Update executes the passed function. This method can be called safely from a
 // goroutine in order to update the GUI. It is important to note that the
 // passed function won't be executed immediately, instead it will be added to
-// the user events queue. Given that Update spawns a goroutine, the order in
-// which the user events will be handled is not guaranteed.
+// the user events queue. The execution of the passed function is guaranteed to
+// be in total order with respect to the calling order of Update()s.
 func (g *Gui) Update(f func(*Gui) error) {
-	go func() { g.userEvents <- userEvent{f: f} }()
+	// Go channels block upon buffer full, prevent that with
+	// go routines conditionally executed in total order
+	go func(waitIndex uint64) {
+		g.updateMutex.Lock()
+		for waitIndex != g.updateWaitIndex {
+			g.updateWaitCond.Wait()
+		}
+		g.userEvents <- userEvent{f: f}
+		atomic.AddUint64(&g.updateWaitIndex, 1)
+		g.updateWaitCond.Broadcast()
+		g.updateMutex.Unlock()
+	}(atomic.AddUint64(&g.updateWaitCounter, 1))
 }
 
 // A Manager is in charge of GUI's layout and can be used to build widgets.
