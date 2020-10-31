@@ -1,4 +1,4 @@
-module github.com/awesome-gocui/gocui
+module github.com/call-buddy/gocui
 
 go 1.12
 
