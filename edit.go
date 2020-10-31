@@ -6,6 +6,7 @@ package gocui
 
 import (
 	"github.com/go-errors/errors"
+	"unicode"
 
 	"github.com/mattn/go-runewidth"
 )
@@ -81,6 +82,25 @@ func (v *View) EditDeleteToStartOfLine() {
 		for x > 0 {
 			v.EditDelete(true)
 			x, _ = v.Cursor()
+		}
+	}
+}
+
+// EditDeleteToBeforeWord is the equivalent of pressing ctrl+W in your terminal, it deletes to the start of the previous word. If there is whitespace before the cursor it also deletes that in addition to the previous word.
+func (v *View) EditDeleteToBeforeWord() {
+	x, y := v.Cursor()
+	if x == 0 {
+		v.EditDelete(true)
+	} else {
+		// delete potential initial whitespace
+		for x > 0 && unicode.IsSpace(v.lines[y][x-1].chr) {
+			v.EditDelete(true)
+			x, y = v.Cursor()
+		}
+		// delete characters until we are the start of the line or we hit whitespace again
+		for x > 0 && !unicode.IsSpace(v.lines[y][x-1].chr) {
+			v.EditDelete(true)
+			x, y = v.Cursor()
 		}
 	}
 }
